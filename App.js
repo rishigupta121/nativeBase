@@ -1,17 +1,32 @@
-
 import { Font, Constants  } from 'expo';
 import React from 'react';
-import { Container, Header, Title,
-   Content, Footer, FooterTab, Button, Right, Body, Icon,
-    Text, Form,Spinner, Item, Input, Label, Badge,
+import {
+  WebView
+} from 'react-native';
+import { Container,
+   Content, Button,
+    Text, Form, Item, Input, Label, Badge,
     View,
-    Left
     } from 'native-base';
-    import firebase from 'firebase';
+    import {
+      Linking,
+      WebBrowser
+    } from 'expo'
+import {
+  CustomHeader,
+  CustomSpinner
+} from './src/components/common'
+import firebase from 'firebase';
+const captchaUrl = `https://phone-login-536c9.firebaseapp.com/captcha.html?appurl=${Linking.makeUrl('')}`;
+
 export default class App extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { loading: true };
+    this.state = {
+      loading: true,
+      phoneNumber: '+91',
+      message:null
+    };
   }
   async componentDidMount() {
     await Font.loadAsync({
@@ -19,74 +34,87 @@ export default class App extends React.Component {
       'Roboto_medium': require('native-base/Fonts/Roboto_medium.ttf') 
     });
     this.setState({ loading: false });
+      const config = {
+        apiKey: "AIzaSyB5OTFxrmsLItoxP6ISO9gxTtjcSN9FlXQ",
+        authDomain: "phone-login-536c9.firebaseapp.com",
+        databaseURL: "https://phone-login-536c9.firebaseio.com",
+        projectId: "phone-login-536c9",
+        storageBucket: "phone-login-536c9.appspot.com",
+        messagingSenderId: "305382960164"
+      };
+          firebase.initializeApp(config);
+
   }
-  var phoneNumber = getPhoneNumberFromUserInput();
-var appVerifier = window.recaptchaVerifier;
-firebase.auth().signInWithPhoneNumber(phoneNumber, appVerifier)
-    .then(function (confirmationResult) {
-      // SMS sent. Prompt user to type the code from the message, then sign the
-      // user in with confirmationResult.confirm(code).
-      window.confirmationResult = confirmationResult;
-    }).catch(function (error) {
-      // Error; SMS not sent
-      // ...
-    });
+  onButtonPress = async () => {
+             let token = null
+             const listener = ({
+               url
+             }) => {
+               WebBrowser.dismissBrowser()
+               const tokenEncoded = Linking.parse(url).queryParams['token']
+               if (tokenEncoded)
+                 token = decodeURIComponent(tokenEncoded)
+             }
+             Linking.addEventListener('url', listener)
+             await WebBrowser.openBrowserAsync(captchaUrl)
+             Linking.removeEventListener('url', listener)
+             if (token) {
+               const {
+                 phone
+               } = this.state
+               //fake firebase.auth.ApplicationVerifier
+               const captchaVerifier = {
+                 type: 'recaptcha',
+                 verify: () => Promise.resolve(token)
+               }
+               try {
+                 const confirmationResult = await firebase.auth().signInWithPhoneNumber('+918923569047', captchaVerifier)
+                 this.setState({
+                   confirmationResult
+                 })
+               } catch (e) {
+                 console.warn(e)
+               }
+
+             }
+           
+  }
+
+     onPhoneChange = (phone) => {
+       this.setState({
+         phone
+       })
+     }
   render() {
     if (this.state.loading) {
       return (
-        <Container style={{ paddingTop: Constants.statusBarHeight }}>
-           <Content contentContainerStyle={{ justifyContent: 'center', flex: 1 }}>
-           <Spinner color='blue' />
-           </Content>
-        </Container>
+        <CustomSpinner />
       );
     }
     return (
       <Container style={{ paddingTop: Constants.statusBarHeight }}>
-      <Header style={styles.headerStyle}>
-      <Left style={{flex:1}}/>
-        <Body>
-          <Title style={{flex:1, paddingTop:10 }}>Login</Title>
-        </Body>
-        <Right style={{flex:1}}/>
-      </Header>
+        <CustomHeader headerText = "Login" />
       <Content padder>
         <Form>
             <Item floatingLabel>
               <Label>Phone No</Label>
-              <Input />
+              < Input/>
             </Item>
             <Item floatingLabel last>
               <Label>code</Label>
               <Input />
             </Item>
             <View style={styles.loginButtonSection}>
-            <Button primary onPress={() => alert("This is Card Header")}><Text>Sign In </Text></Button>
+            <Button ref="sign-in-button" primary onPress={this.onButtonPress.bind(this)}><Text>Sign In </Text></Button>
             </View>
           </Form>
+          < WebView source = {
+            {
+              html: '<div id="recaptcha-container"></div>'
+            }
+          }
+          />
         </Content>
-      <Footer>
-        <FooterTab>
-        <Button badge vertical>
-              <Badge><Text>2</Text></Badge>
-              <Icon name="apps" />
-              <Text>Apps</Text>
-            </Button>
-            <Button vertical>
-              <Icon name="camera" />
-              <Text>Camera</Text>
-            </Button>
-            <Button active badge vertical>
-              <Badge ><Text>51</Text></Badge>
-              <Icon active name="navigate" />
-              <Text>Navigate</Text>
-            </Button>
-            <Button vertical>
-              <Icon name="person" />
-              <Text>Contact</Text>
-            </Button>
-        </FooterTab>
-      </Footer>
     </Container>
     );
   }
@@ -94,8 +122,9 @@ firebase.auth().signInWithPhoneNumber(phoneNumber, appVerifier)
 
 const styles= {
   headerStyle: {
-    alignContent: 'center',
-    alignItems: 'center',
+    flexDirection: 'row',
+    // alignContent: 'center',
+    // alignItems: 'center',
     alignSelf: 'center',
   },
   centerBlock: {
